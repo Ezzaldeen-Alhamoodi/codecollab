@@ -1,0 +1,191 @@
+{% extends "layout.html" %}
+
+{% block title %}Projects - CodeCollab{% endblock %}
+
+{% block main %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="h3 mb-1">My Projects</h1>
+        <p class="text-muted mb-0">Manage and collaborate on your coding projects</p>
+    </div>
+    <a href="/projects/new" class="btn btn-primary">
+        <i class="fas fa-plus me-2"></i>New Project
+    </a>
+</div>
+
+<!-- Filters and Search -->
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <div class="row align-items-center">
+            <div class="col-md-6 mb-2 mb-md-0">
+                <div class="btn-group" role="group">
+                    <a href="/projects?filter=all"
+                       class="btn btn-outline-primary {% if filter_type == 'all' %}active{% endif %}">
+                        All Projects
+                    </a>
+                    <a href="/projects?filter=owned"
+                       class="btn btn-outline-primary {% if filter_type == 'owned' %}active{% endif %}">
+                        My Projects
+                    </a>
+                    <a href="/projects?filter=collaborating"
+                       class="btn btn-outline-primary {% if filter_type == 'collaborating' %}active{% endif %}">
+                        Collaborating
+                    </a>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <form method="GET" class="d-flex">
+                    <input type="hidden" name="filter" value="{{ filter_type }}">
+                    <div class="input-group">
+                        <input type="text" class="form-control" name="search"
+                               placeholder="Search projects..." value="{{ search_query }}">
+                        <button class="btn btn-outline-secondary" type="submit">
+                            <i class="fas fa-search"></i>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Projects Grid -->
+{% if projects %}
+<div class="row">
+    {% for project in projects %}
+    <div class="col-xl-4 col-lg-6 mb-4">
+        <div class="card project-card h-100 shadow-sm">
+            <div class="card-header bg-white border-0 pb-0">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <span class="badge bg-light text-dark mb-2">
+                            <i class="{{ get_language_icon(project.language) }} me-1"></i>
+                            {{ project.language }}
+                        </span>
+                        {% if project.user_role == 'owner' %}
+                        <span class="badge bg-primary ms-1">Owner</span>
+                        {% else %}
+                        <span class="badge bg-success ms-1">{{ project.user_role|title }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-secondary border-0" type="button"
+                                data-bs-toggle="dropdown">
+                            <i class="fas fa-ellipsis-v"></i>
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li>
+                                <a class="dropdown-item" href="/project/{{ project.id }}">
+                                    <i class="fas fa-eye me-2"></i>View Project
+                                </a>
+                            </li>
+                            {% if project.user_role == 'owner' %}
+                            <li>
+                                <a class="dropdown-item" href="/project/{{ project.id }}/edit">
+                                    <i class="fas fa-edit me-2"></i>Edit Settings
+                                </a>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <a class="dropdown-item text-danger" href="#">
+                                    <i class="fas fa-trash me-2"></i>Delete Project
+                                </a>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card-body">
+                <h5 class="card-title">
+                    <a href="/project/{{ project.id }}" class="text-decoration-none text-dark">
+                        {{ project.title }}
+                    </a>
+                </h5>
+                <p class="card-text text-muted">
+                    {{ project.description or "No description provided." }}
+                </p>
+
+                <div class="project-meta mb-3">
+                    <small class="text-muted">
+                        <i class="fas fa-user me-1"></i>
+                        <a href="#" class="text-muted text-decoration-none">
+                            {{ project.owner_name }}
+                        </a>
+                    </small>
+                    <small class="text-muted ms-3">
+                        <i class="fas fa-users me-1"></i>{{ project.member_count }}
+                    </small>
+                    <small class="text-muted ms-3">
+                        <i class="fas fa-file me-1"></i>{{ project.file_count }}
+                    </small>
+                </div>
+
+                {% if not project.is_public %}
+                <span class="badge bg-warning text-dark">
+                    <i class="fas fa-lock me-1"></i>Private
+                </span>
+                {% else %}
+                <span class="badge bg-success">
+                    <i class="fas fa-globe me-1"></i>Public
+                </span>
+                {% endif %}
+            </div>
+
+            <div class="card-footer bg-white border-0 pt-0">
+                <div class="d-flex justify-content-between align-items-center">
+                    <small class="text-muted">
+                        Updated {{ format_timestamp(project.updated_at) }}
+                    </small>
+                    <a href="/project/{{ project.id }}" class="btn btn-sm btn-outline-primary">
+                        Open <i class="fas fa-arrow-right ms-1"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<!-- Empty State -->
+<div class="text-center py-5">
+    <div class="empty-state">
+        <i class="fas fa-project-diagram fa-4x text-muted mb-3"></i>
+        <h3 class="text-muted">No projects found</h3>
+        <p class="text-muted mb-4">
+            {% if search_query %}
+            No projects match your search criteria. Try different keywords.
+            {% else %}
+            {% if filter_type == 'owned' %}
+            You haven't created any projects yet.
+            {% elif filter_type == 'collaborating' %}
+            You're not collaborating on any projects yet.
+            {% else %}
+            You don't have any projects yet.
+            {% endif %}
+            {% endif %}
+        </p>
+        <a href="/projects/new" class="btn btn-primary btn-lg">
+            <i class="fas fa-plus me-2"></i>Create Your First Project
+        </a>
+    </div>
+</div>
+{% endif %}
+
+<style>
+.project-card {
+    transition: all 0.3s ease;
+    border: 1px solid #e9ecef;
+}
+.project-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    border-color: #007bff;
+}
+.empty-state {
+    max-width: 400px;
+    margin: 0 auto;
+}
+</style>
+{% endblock %}
