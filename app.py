@@ -21,6 +21,57 @@ if database_url:
     if database_url.startswith("postgres://"):
         database_url = database_url.replace("postgres://", "postgresql://")
     db = SQL(database_url)
+    # إنشاء الجداول إذا لم تكن موجودة في PostgreSQL
+    try:
+        db.execute("SELECT 1 FROM users LIMIT 1")
+    except:
+        # الجداول غير موجودة، فلننشئها
+        db.execute("""
+            CREATE TABLE users (
+                id SERIAL PRIMARY KEY,
+                username VARCHAR(80) UNIQUE NOT NULL,
+                email VARCHAR(120) UNIQUE NOT NULL,
+                hash TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        db.execute("""
+            CREATE TABLE projects (
+                id SERIAL PRIMARY KEY,
+                owner_id INTEGER NOT NULL,
+                title VARCHAR(200) NOT NULL,
+                description TEXT,
+                language VARCHAR(50) DEFAULT 'python',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                is_public BOOLEAN DEFAULT TRUE,
+                FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        """)
+        db.execute("""
+            CREATE TABLE code_files (
+                id SERIAL PRIMARY KEY,
+                project_id INTEGER NOT NULL,
+                filename VARCHAR(200) NOT NULL,
+                content TEXT,
+                language VARCHAR(50) DEFAULT 'python',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+            )
+        """)
+        db.execute("""
+            CREATE TABLE project_members (
+                id SERIAL PRIMARY KEY,
+                project_id INTEGER NOT NULL,
+                user_id INTEGER NOT NULL,
+                role VARCHAR(20) DEFAULT 'collaborator',
+                joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                UNIQUE(project_id, user_id)
+            )
+        """)
 else:
     # وإلا استخدم SQLite محلي
     db = SQL("sqlite:///codecollab.db")
@@ -106,10 +157,19 @@ def register():
 
         # Insert new user
         try:
-            user_id = db.execute(
-                "INSERT INTO users (username, email, hash) VALUES (?, ?, ?)",
-                username, email, hash_password
-            )
+            # لـ PostgreSQL نستخدم RETURNING id للحصول على الـ ID
+            if database_url and "postgresql" in database_url:
+                result = db.execute(
+                    "INSERT INTO users (username, email, hash) VALUES (%s, %s, %s) RETURNING id",
+                    username, email, hash_password
+                )
+                user_id = result[0]["id"]
+            else:
+                # لـ SQLite
+                user_id = db.execute(
+                    "INSERT INTO users (username, email, hash) VALUES (?, ?, ?)",
+                    username, email, hash_password
+                )
 
             # Log user in
             session["user_id"] = user_id
@@ -118,6 +178,7 @@ def register():
             return redirect("/dashboard")
 
         except Exception as e:
+            print(f"Registration error: {e}")
             return apology("registration failed", 500)
 
     else:
@@ -178,10 +239,17 @@ def new_project():
 
         try:
             # Create project
-            project_id = db.execute(
-                "INSERT INTO projects (owner_id, title, description, language) VALUES (?, ?, ?, ?)",
-                user_id, title, description, language
-            )
+            if database_url and "postgresql" in database_url:
+                result = db.execute(
+                    "INSERT INTO projects (owner_id, title, description, language) VALUES (%s, %s, %s, %s) RETURNING id",
+                    user_id, title, description, language
+                )
+                project_id = result[0]["id"]
+            else:
+                project_id = db.execute(
+                    "INSERT INTO projects (owner_id, title, description, language) VALUES (?, ?, ?, ?)",
+                    user_id, title, description, language
+                )
 
             # Create default main file based on language
             default_files = {
@@ -203,6 +271,7 @@ def new_project():
             return redirect(f"/project/{project_id}")
 
         except Exception as e:
+            print(f"Project creation error: {e}")
             return apology("failed to create project", 500)
 
     else:
@@ -318,21 +387,30 @@ def create_file():
 
     # Create file
     try:
-        file_id = db.execute("""
-            INSERT INTO code_files (project_id, filename, content)
-            VALUES (?, ?, ?)
-        """, project_id, filename, f"# {filename}\n\n# Start coding here...")
+        if database_url and "postgresql" in database_url:
+            result = db.execute("""
+                INSERT INTO code_files (project_id, filename, content)
+                VALUES (%s, %s, %s) RETURNING id
+            """, project_id, filename, f"# {filename}\n\n# Start coding here...")
+            file_id = result[0]["id"]
+        else:
+            file_id = db.execute("""
+                INSERT INTO code_files (project_id, filename, content)
+                VALUES (?, ?, ?)
+            """, project_id, filename, f"# {filename}\n\n# Start coding here...")
 
         return jsonify({"success": True, "file_id": file_id})
 
     except Exception as e:
+        print(f"File creation error: {e}")
         return jsonify({"success": False, "error": "File creation failed"})
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
 
 @app.route("/about")
 def about():
     """About page with developer information"""
     return render_template("about.html")
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)
+    
