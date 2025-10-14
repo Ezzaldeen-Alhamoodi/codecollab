@@ -38,7 +38,10 @@
             
             {% if session.user_id %}
             <div class="navbar-nav ms-auto">
+                <span class="navbar-text me-3">{{ session.username }}</span>
                 <a class="nav-link" href="/dashboard">Dashboard</a>
+                <a class="nav-link" href="/profile">Profile</a>
+                <a class="nav-link" href="/about">About</a>
                 <a class="nav-link" href="/logout">Logout</a>
             </div>
             {% else %}

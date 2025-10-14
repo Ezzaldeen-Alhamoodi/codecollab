@@ -1,19 +1,36 @@
 import os
-from flask import Flask, render_template, session, redirect, request, flash, url_for
+from flask import Flask, render_template, session, redirect, request, flash, url_for, jsonify
+from functools import wraps
 
 app = Flask(__name__)
-app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "simple-test-key-12345")
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "codecollab-secret-2025")
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 
-# تخزين مؤقت للمستخدمين (في الذاكرة)
+# تخزين البيانات في الذاكرة (للنسخة المبسطة)
 users_db = {
     "testuser": "testpass123",
     "admin": "admin123"
 }
 
+projects_db = {}
+files_db = {}
+project_counter = 1
+file_counter = 1
+
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if "username" not in session:
+            flash("🔒 Please log in first")
+            return redirect("/login")
+        return f(*args, **kwargs)
+    return decorated_function
+
 @app.route("/")
 def index():
-    return render_template("index.html", db_status="✅ Simple Test Mode")
+    if "username" in session:
+        return redirect("/dashboard")
+    return render_template("index.html", db_status="✅ Simple Mode - Working")
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
@@ -21,8 +38,6 @@ def register():
         try:
             username = request.form.get("username", "").strip()
             password = request.form.get("password", "").strip()
-            
-            print(f"Registration attempt: {username}")
             
             if not username or not password:
                 flash("⚠️ Please fill in all fields")
@@ -40,16 +55,14 @@ def register():
                 flash("⚠️ Username already exists")
                 return redirect("/register")
             
-            # حفظ المستخدم الجديد
             users_db[username] = password
             session["username"] = username
-            session["user_id"] = len(users_db)  # ID بسيط
+            session["user_id"] = len(users_db)
             
             flash("🎉 Registration successful! Welcome to CodeCollab!")
             return redirect("/dashboard")
             
         except Exception as e:
-            print(f"Registration error: {e}")
             flash("❌ Registration failed. Please try again.")
             return redirect("/register")
     
@@ -62,12 +75,6 @@ def login():
             username = request.form.get("username", "").strip()
             password = request.form.get("password", "").strip()
             
-            print(f"Login attempt: {username}")
-            
-            if not username or not password:
-                flash("⚠️ Please fill in all fields")
-                return redirect("/login")
-            
             if username in users_db and users_db[username] == password:
                 session["username"] = username
                 session["user_id"] = list(users_db.keys()).index(username) + 1
@@ -78,113 +85,230 @@ def login():
                 return redirect("/login")
                 
         except Exception as e:
-            print(f"Login error: {e}")
             flash("❌ Login failed. Please try again.")
             return redirect("/login")
     
     return render_template("login.html")
 
 @app.route("/dashboard")
+@login_required
 def dashboard():
-    if "username" not in session:
-        flash("🔒 Please log in first")
-        return redirect("/login")
+    username = session["username"]
+    user_projects = []
     
-    user_projects = [
-        {"id": 1, "title": "My First Project", "language": "python", "description": "Getting started with CodeCollab"},
-        {"id": 2, "title": "Web App", "language": "javascript", "description": "Building a web application"}
-    ]
+    # جلب مشاريع المستخدم
+    for project_id, project in projects_db.items():
+        if project["owner"] == username:
+            user_projects.append(project)
     
     stats = {
         "projects_count": len(user_projects),
-        "total_files": 5
+        "total_files": sum(len(project.get("files", [])) for project in user_projects)
     }
     
     return render_template("dashboard.html", 
-                         username=session["username"],
+                         username=username,
                          projects=user_projects,
                          stats=stats)
+
+@app.route("/projects/new", methods=["GET", "POST"])
+@login_required
+def new_project():
+    if request.method == "POST":
+        try:
+            title = request.form.get("title", "").strip()
+            description = request.form.get("description", "").strip()
+            language = request.form.get("language", "python")
+            
+            if not title:
+                flash("⚠️ Project title is required")
+                return redirect("/projects/new")
+            
+            global project_counter
+            project_id = project_counter
+            project_counter += 1
+            
+            # إنشاء المشروع
+            projects_db[project_id] = {
+                "id": project_id,
+                "title": title,
+                "description": description,
+                "language": language,
+                "owner": session["username"],
+                "files": []
+            }
+            
+            # إنشاء ملف افتراضي
+            global file_counter
+            file_id = file_counter
+            file_counter += 1
+            
+            default_content = {
+                "python": "# Welcome to your Python project!\n\nprint('Hello, CodeCollab!')\n",
+                "javascript": "// Welcome to your JavaScript project!\n\nconsole.log('Hello, CodeCollab!');\n",
+                "html": "<!DOCTYPE html>\n<html>\n<head>\n    <title>My Project</title>\n</head>\n<body>\n    <h1>Hello, CodeCollab!</h1>\n</body>\n</html>\n",
+                "java": "// Welcome to your Java project!\n\npublic class Main {\n    public static void main(String[] args) {\n        System.out.println(\"Hello, CodeCollab!\");\n    }\n}\n"
+            }
+            
+            filename = {
+                "python": "main.py",
+                "javascript": "app.js", 
+                "html": "index.html",
+                "java": "Main.java"
+            }.get(language, "main.txt")
+            
+            files_db[file_id] = {
+                "id": file_id,
+                "project_id": project_id,
+                "filename": filename,
+                "content": default_content.get(language, "# Start coding here...\n"),
+                "language": language
+            }
+            
+            projects_db[project_id]["files"].append(file_id)
+            
+            flash(f"🎉 Project '{title}' created successfully!")
+            return redirect(f"/project/{project_id}")
+            
+        except Exception as e:
+            flash("❌ Failed to create project")
+            return redirect("/projects/new")
+    
+    return render_template("new_project.html")
+
+@app.route("/project/<int:project_id>")
+@login_required
+def view_project(project_id):
+    username = session["username"]
+    
+    if project_id not in projects_db:
+        flash("❌ Project not found")
+        return redirect("/dashboard")
+    
+    project = projects_db[project_id]
+    
+    # التحقق من ملكية المشروع
+    if project["owner"] != username:
+        flash("❌ Access denied")
+        return redirect("/dashboard")
+    
+    # جلب ملفات المشروع
+    project_files = []
+    for file_id in project["files"]:
+        if file_id in files_db:
+            project_files.append(files_db[file_id])
+    
+    return render_template("project.html", 
+                         project=project, 
+                         files=project_files)
+
+@app.route("/editor/<int:project_id>/<int:file_id>")
+@login_required
+def code_editor(project_id, file_id):
+    username = session["username"]
+    
+    # التحقق من وجود المشروع والملف
+    if project_id not in projects_db or file_id not in files_db:
+        flash("❌ File not found")
+        return redirect("/dashboard")
+    
+    project = projects_db[project_id]
+    file_data = files_db[file_id]
+    
+    # التحقق من الملكية
+    if project["owner"] != username or file_data["project_id"] != project_id:
+        flash("❌ Access denied")
+        return redirect("/dashboard")
+    
+    # جلب جميع ملفات المشروع للشريط الجانبي
+    project_files = []
+    for fid in project["files"]:
+        if fid in files_db:
+            project_files.append(files_db[fid])
+    
+    return render_template("editor.html",
+                         project=project,
+                         file=file_data,
+                         project_files=project_files)
+
+@app.route("/api/save_code", methods=["POST"])
+@login_required
+def save_code():
+    try:
+        file_id = request.json.get("file_id")
+        content = request.json.get("content")
+        
+        if not file_id or file_id not in files_db:
+            return jsonify({"success": False, "error": "File not found"})
+        
+        # تحديث محتوى الملف
+        files_db[file_id]["content"] = content
+        
+        return jsonify({"success": True})
+        
+    except Exception as e:
+        return jsonify({"success": False, "error": "Save failed"})
+
+@app.route("/api/create_file", methods=["POST"])
+@login_required
+def create_file():
+    try:
+        project_id = request.json.get("project_id")
+        filename = request.json.get("filename")
+        
+        if not project_id or not filename:
+            return jsonify({"success": False, "error": "Missing data"})
+        
+        if project_id not in projects_db:
+            return jsonify({"success": False, "error": "Project not found"})
+        
+        # إنشاء ملف جديد
+        global file_counter
+        file_id = file_counter
+        file_counter += 1
+        
+        files_db[file_id] = {
+            "id": file_id,
+            "project_id": project_id,
+            "filename": filename,
+            "content": f"# {filename}\n\n# Start coding here...\n",
+            "language": "text"
+        }
+        
+        projects_db[project_id]["files"].append(file_id)
+        
+        return jsonify({"success": True, "file_id": file_id})
+        
+    except Exception as e:
+        return jsonify({"success": False, "error": "File creation failed"})
+
+@app.route("/profile")
+@login_required
+def profile():
+    username = session["username"]
+    
+    # حساب الإحصائيات
+    user_projects = [p for p in projects_db.values() if p["owner"] == username]
+    total_files = sum(len(p.get("files", [])) for p in user_projects)
+    
+    stats = {
+        "project_count": len(user_projects),
+        "file_count": total_files
+    }
+    
+    return render_template("profile.html", 
+                         username=username, 
+                         stats=stats)
+
+@app.route("/about")
+def about():
+    return render_template("about.html")
 
 @app.route("/logout")
 def logout():
     session.clear()
     flash("✅ Logged out successfully")
     return redirect("/")
-
-# صفحة بسيطة للتعريف بالمطور
-@app.route("/about")
-def about():
-    return """
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>About - CodeCollab</title>
-        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    </head>
-    <body>
-        <nav class="navbar navbar-dark bg-dark">
-            <div class="container">
-                <a class="navbar-brand" href="/">CodeCollab</a>
-            </div>
-        </nav>
-        <div class="container mt-5">
-            <h1>About CodeCollab</h1>
-            <div class="card">
-                <div class="card-body">
-                    <h5>Developer Information</h5>
-                    <p><strong>Name:</strong> Ezzaldeen Nashwan Ali Alhamoodi</p>
-                    <p><strong>Project:</strong> CS50x 2025 Final Project</p>
-                    <p><strong>Description:</strong> A collaborative coding platform for developers.</p>
-                    <a href="/" class="btn btn-primary">Back to Home</a>
-                </div>
-            </div>
-        </div>
-    </body>
-    </html>
-    """
-
-# معالج للأخطاء
-@app.errorhandler(500)
-def internal_error(error):
-    return """
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Error - CodeCollab</title>
-        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    </head>
-    <body>
-        <div class="container mt-5">
-            <div class="alert alert-danger">
-                <h4>Internal Server Error</h4>
-                <p>Something went wrong. Please try again later.</p>
-                <a href="/" class="btn btn-primary">Go Home</a>
-            </div>
-        </div>
-    </body>
-    </html>
-    """, 500
-
-@app.errorhandler(404)
-def not_found(error):
-    return """
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Not Found - CodeCollab</title>
-        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    </head>
-    <body>
-        <div class="container mt-5">
-            <div class="alert alert-warning">
-                <h4>Page Not Found</h4>
-                <p>The page you're looking for doesn't exist.</p>
-                <a href="/" class="btn btn-primary">Go Home</a>
-            </div>
-        </div>
-    </body>
-    </html>
-    """, 404
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))

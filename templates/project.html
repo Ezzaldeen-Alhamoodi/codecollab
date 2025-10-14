@@ -1,156 +1,158 @@
-{% extends "layout.html" %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ project.title }} - CodeCollab</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">CodeCollab</a>
+            <div class="navbar-nav ms-auto">
+                <span class="navbar-text me-3">{{ session.username }}</span>
+                <a class="nav-link" href="/dashboard">Dashboard</a>
+                <a class="nav-link" href="/logout">Logout</a>
+            </div>
+        </div>
+    </nav>
 
-{% block title %}{{ project.title }} - CodeCollab{% endblock %}
+    <div class="container mt-4">
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-info alert-dismissible fade show">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
 
-{% block content %}
-<div class="row">
-    <div class="col-12">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <div>
-                <h1>{{ project.title }}</h1>
-                <p class="text-muted">{{ project.description }}</p>
+                <h2>{{ project.title }}</h2>
+                <p class="text-muted mb-1">{{ project.description or "No description" }}</p>
                 <span class="badge bg-secondary">{{ project.language }}</span>
             </div>
             <div>
-                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newFileModal">
-                    <i class="fas fa-plus"></i> New File
-                </button>
-                <a href="/dashboard" class="btn btn-secondary">
+                <a href="/dashboard" class="btn btn-outline-secondary">
                     <i class="fas fa-arrow-left"></i> Back to Dashboard
+                </a>
+                <a href="/projects/new" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> New Project
                 </a>
             </div>
         </div>
 
-        {% if files %}
         <div class="row">
-            {% for file in files %}
-            <div class="col-md-6 col-lg-4 mb-4">
-                <div class="card file-card h-100">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-start mb-2">
-                            <h5 class="card-title">
-                                <i class="fas fa-file-code text-primary"></i>
-                                {{ file.filename }}
-                            </h5>
-                            <span class="badge bg-light text-dark">{{ file.language }}</span>
-                        </div>
-
-                        <p class="card-text text-muted small">
-                            <i class="fas fa-clock me-1"></i>
-                            Last updated: {{ file.updated_at[:16] }}
-                        </p>
-
-                        <div class="file-content-preview small text-muted mb-3">
-                            {{ file.content[:100] }}{% if file.content|length > 100 %}...{% endif %}
-                        </div>
+            <div class="col-lg-8">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Project Files</h5>
+                        <button class="btn btn-sm btn-primary" onclick="createNewFile()">
+                            <i class="fas fa-plus"></i> New File
+                        </button>
                     </div>
-
-                    <div class="card-footer bg-transparent">
-                        <a href="/editor/{{ project.id }}/{{ file.id }}" class="btn btn-primary btn-sm w-100">
-                            <i class="fas fa-edit"></i> Open in Editor
-                        </a>
+                    <div class="card-body">
+                        {% if files %}
+                            <div class="list-group">
+                                {% for file in files %}
+                                    <a href="/editor/{{ project.id }}/{{ file.id }}" 
+                                       class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <i class="fas fa-file-code me-2"></i>
+                                            {{ file.filename }}
+                                        </div>
+                                        <span class="badge bg-light text-dark">{{ file.language }}</span>
+                                    </a>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <div class="text-center py-4">
+                                <i class="fas fa-folder-open fa-2x text-muted mb-3"></i>
+                                <p class="text-muted">No files in this project yet</p>
+                                <button class="btn btn-primary" onclick="createNewFile()">
+                                    <i class="fas fa-plus"></i> Create First File
+                                </button>
+                            </div>
+                        {% endif %}
                     </div>
                 </div>
             </div>
-            {% endfor %}
-        </div>
-        {% else %}
-        <div class="text-center py-5">
-            <i class="fas fa-folder-open fa-4x text-muted mb-3"></i>
-            <h3 class="text-muted">No files yet</h3>
-            <p class="text-muted mb-4">Create your first file to start coding!</p>
-            <button class="btn btn-primary btn-lg" data-bs-toggle="modal" data-bs-target="#newFileModal">
-                <i class="fas fa-plus"></i> Create First File
-            </button>
-        </div>
-        {% endif %}
-    </div>
-</div>
-
-<!-- New File Modal -->
-<div class="modal fade" id="newFileModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Create New File</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <form id="newFileForm">
-                    <div class="mb-3">
-                        <label for="filename" class="form-label">Filename</label>
-                        <input type="text" class="form-control" id="filename" name="filename"
-                               placeholder="e.g., main.py" required>
-                        <div class="form-text">Include file extension (e.g., .py, .js, .html)</div>
+            
+            <div class="col-lg-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Project Information</h5>
                     </div>
-                    <input type="hidden" id="project_id" value="{{ project.id }}">
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="createNewFile()">Create File</button>
+                    <div class="card-body">
+                        <p><strong>Owner:</strong> {{ project.owner }}</p>
+                        <p><strong>Language:</strong> {{ project.language }}</p>
+                        <p><strong>Files:</strong> {{ files|length }}</p>
+                        <p><strong>Created by:</strong> Ezzaldeen Nashwan Ali Alhamoodi</p>
+                    </div>
+                </div>
+                
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">Quick Actions</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-outline-primary" onclick="createNewFile()">
+                                <i class="fas fa-file"></i> New File
+                            </button>
+                            <a href="/projects/new" class="btn btn-outline-success">
+                                <i class="fas fa-plus"></i> New Project
+                            </a>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
-</div>
 
-<script>
-async function createNewFile() {
-    const filename = document.getElementById('filename').value;
-    const projectId = document.getElementById('project_id').value;
+    <footer class="mt-5 py-4 bg-light">
+        <div class="container text-center">
+            <p class="mb-0">
+                Developed by <strong>Ezzaldeen Nashwan Ali Alhamoodi</strong> 
+                | CS50x 2025 Final Project
+            </p>
+        </div>
+    </footer>
 
-    if (!filename) {
-        alert('Please enter a filename');
-        return;
-    }
-
-    try {
-        const response = await fetch('/api/create_file', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                project_id: projectId,
-                filename: filename
+    <script>
+    function createNewFile() {
+        const filename = prompt("Enter filename (with extension, e.g., 'script.py'):");
+        if (filename) {
+            fetch('/api/create_file', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    project_id: {{ project.id }},
+                    filename: filename
+                })
             })
-        });
-
-        const result = await response.json();
-
-        if (result.success) {
-            // Reload page to show new file
-            location.reload();
-        } else {
-            alert('Error creating file: ' + result.error);
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert('Error creating file: ' + data.error);
+                }
+            })
+            .catch(error => {
+                alert('Error: ' + error);
+            });
         }
-    } catch (error) {
-        alert('Error creating file: ' + error);
     }
-}
+    </script>
 
-// Close modal and reset form
-document.getElementById('newFileModal').addEventListener('hidden.bs.modal', function () {
-    document.getElementById('filename').value = '';
-});
-</script>
-
-<style>
-.file-card {
-    transition: all 0.3s ease;
-}
-
-.file-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-}
-
-.file-content-preview {
-    font-family: 'Monaco', 'Consolas', monospace;
-    background: #f8f9fa;
-    padding: 8px;
-    border-radius: 4px;
-    border-left: 3px solid #007bff;
-}
-</style>
-{% endblock %}s
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

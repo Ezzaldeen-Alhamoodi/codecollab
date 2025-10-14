@@ -1,49 +1,109 @@
-{% extends "layout.html" %}
-
-{% block title %}About - CodeCollab{% endblock %}
-
-{% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-8">
-        <div class="card">
-            <div class="card-header">
-                <h3 class="mb-0">About CodeCollab</h3>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>About - CodeCollab</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">CodeCollab</a>
+            <div class="navbar-nav ms-auto">
+                {% if session.username %}
+                    <a class="nav-link" href="/dashboard">Dashboard</a>
+                    <a class="nav-link" href="/logout">Logout</a>
+                {% else %}
+                    <a class="nav-link" href="/login">Login</a>
+                    <a class="nav-link" href="/register">Register</a>
+                {% endif %}
             </div>
-            <div class="card-body">
-                <div class="text-center mb-4">
-                    <h4>Developed by <strong>Ezzaldeen Nashwan Ali Alhamoodi</strong></h4>
-                    <p class="text-muted">CS50x 2025 Final Project</p>
-                </div>
-                
-                <div class="row">
-                    <div class="col-md-6">
-                        <h5>Contact Information</h5>
-                        <ul class="list-unstyled">
-                            <li><i class="fas fa-envelope"></i> Email: ezzaldeennashwan2025@gmail.com</li>
-                            <li><i class="fab fa-github"></i> GitHub: Ezzaldeen-Alhamoodi</li>
-                            <li><i class="fab fa-linkedin"></i> LinkedIn: ezzaldeen-alhamoodi</li>
-                        </ul>
+        </div>
+    </nav>
+
+    <div class="container mt-5">
+        <div class="row justify-content-center">
+            <div class="col-md-10">
+                <div class="card">
+                    <div class="card-body">
+                        <h1 class="text-center mb-4">About CodeCollab</h1>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h3>Developer Information</h3>
+                                <p><strong>Name:</strong> Ezzaldeen Nashwan Ali Alhamoodi</p>
+                                <p><strong>Email:</strong> ezzaldeennashwan2025@gmail.com</p>
+                                <p><strong>GitHub:</strong> <a href="https://github.com/Ezzaldeen-Alhamoodi" target="_blank">Ezzaldeen-Alhamoodi</a></p>
+                                <p><strong>Course:</strong> CS50x 2025</p>
+                                <p><strong>Project:</strong> Final Project</p>
+                            </div>
+                            <div class="col-md-6">
+                                <h3>Project Details</h3>
+                                <p><strong>Project Name:</strong> CodeCollab</p>
+                                <p><strong>Description:</strong> A collaborative coding platform for developers</p>
+                                <p><strong>Technologies:</strong> Python, Flask, HTML, CSS, JavaScript, Bootstrap</p>
+                                <p><strong>Deployment:</strong> Render</p>
+                                <p><strong>Database:</strong> PostgreSQL (Production), SQLite (Development)</p>
+                            </div>
+                        </div>
+
+                        <div class="mt-4">
+                            <h3>Features</h3>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <ul>
+                                        <li>User Registration & Authentication</li>
+                                        <li>Project Creation & Management</li>
+                                        <li>Real-time Code Editor</li>
+                                        <li>Multiple File Support</li>
+                                    </ul>
+                                </div>
+                                <div class="col-md-6">
+                                    <ul>
+                                        <li>Multiple Programming Languages</li>
+                                        <li>Auto-save Functionality</li>
+                                        <li>Responsive Design</li>
+                                        <li>User Profiles</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mt-4">
+                            <h3>Supported Languages</h3>
+                            <div class="d-flex flex-wrap gap-2">
+                                <span class="badge bg-primary">Python</span>
+                                <span class="badge bg-success">JavaScript</span>
+                                <span class="badge bg-warning">HTML</span>
+                                <span class="badge bg-danger">Java</span>
+                                <span class="badge bg-info">Text Files</span>
+                            </div>
+                        </div>
+
+                        <div class="text-center mt-4">
+                            <a href="/" class="btn btn-primary">Home</a>
+                            {% if not session.username %}
+                                <a href="/register" class="btn btn-success">Get Started</a>
+                            {% else %}
+                                <a href="/dashboard" class="btn btn-success">Go to Dashboard</a>
+                            {% endif %}
+                        </div>
                     </div>
-                    <div class="col-md-6">
-                        <h5>Project Details</h5>
-                        <ul class="list-unstyled">
-                            <li><i class="fas fa-book"></i> Course: CS50x 2025</li>
-                            <li><i class="fas fa-code"></i> Project: Final Project</li>
-                            <li><i class="fas fa-calendar"></i> Year: 2025</li>
-                        </ul>
-                    </div>
-                </div>
-                
-                <div class="mt-4">
-                    <h5>About the Developer</h5>
-                    <p>
-                        This project represents the culmination of my CS50 learning journey, 
-                        combining all the concepts learned throughout the course into a 
-                        functional, real-world web application.
-                    </p>
                 </div>
             </div>
         </div>
     </div>
-</div>
-{% endblock %}
+
+    <footer class="mt-5 py-4 bg-light">
+        <div class="container text-center">
+            <p class="mb-0">
+                Developed by <strong>Ezzaldeen Nashwan Ali Alhamoodi</strong> 
+                | CS50x 2025 Final Project
+            </p>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

@@ -1,486 +1,227 @@
-{% extends "layout.html" %}
-
-{% block title %}Editor - {{ file.filename }}{% endblock %}
-
-{% block head %}
-<!-- استخدام مكتبة Prism.js لتلوين الكود - أفضل من Highlight.js -->
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-java.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-html.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-css.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-c.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-cpp.min.js"></script>
-{% endblock %}
-
-{% block content %}
-<div class="row h-100">
-    <!-- Files Sidebar -->
-    <div class="col-md-3">
-        <div class="card h-100">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h6 class="mb-0">Project Files</h6>
-                <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#newFileModal">
-                    <i class="fas fa-plus"></i>
-                </button>
-            </div>
-            <div class="card-body p-0">
-                <div class="list-group list-group-flush">
-                    {% for project_file in project_files %}
-                    <a href="/editor/{{ project_id }}/{{ project_file.id }}"
-                       class="list-group-item list-group-item-action {% if project_file.id == file.id %}active{% endif %}">
-                        <i class="fas fa-file-code me-2"></i>
-                        {{ project_file.filename }}
-                    </a>
-                    {% endfor %}
-                </div>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editor - {{ file.filename }} - CodeCollab</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .editor-container {
+            height: 70vh;
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+        }
+        #code-editor {
+            width: 100%;
+            height: 100%;
+            border: none;
+            padding: 1rem;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            resize: none;
+            outline: none;
+        }
+        .file-sidebar {
+            background-color: #f8f9fa;
+            height: 100%;
+            padding: 1rem;
+            border-right: 1px solid #dee2e6;
+        }
+        .file-item {
+            padding: 0.5rem;
+            margin: 0.25rem 0;
+            border-radius: 0.25rem;
+            cursor: pointer;
+            text-decoration: none;
+            display: block;
+            color: #212529;
+        }
+        .file-item:hover {
+            background-color: #e9ecef;
+        }
+        .file-item.active {
+            background-color: #0d6efd;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">CodeCollab</a>
+            <div class="navbar-nav ms-auto">
+                <span class="navbar-text me-3">{{ session.username }}</span>
+                <a class="nav-link" href="/dashboard">Dashboard</a>
+                <a class="nav-link" href="/logout">Logout</a>
             </div>
         </div>
-    </div>
+    </nav>
 
-    <!-- Code Editor -->
-    <div class="col-md-9">
-        <div class="card h-100">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <div>
-                    <h5 class="mb-0">
-                        <i class="fas fa-edit"></i>
-                        {{ file.filename }}
-                    </h5>
-                    <small class="text-muted">in {{ file.project_title }}</small>
-                </div>
-                <div>
-                    <span id="saveStatus" class="badge bg-success me-2">Saved</span>
-                    <div class="btn-group">
-                        <button class="btn btn-sm btn-outline-secondary" onclick="formatCode()" title="Format Code">
-                            <i class="fas fa-broom"></i>
-                        </button>
-                        <button class="btn btn-sm btn-outline-secondary" onclick="copyCode()" title="Copy Code">
-                            <i class="fas fa-copy"></i>
-                        </button>
-                        <a href="/project/{{ project_id }}" class="btn btn-sm btn-secondary">
-                            <i class="fas fa-folder"></i> Project
+    <div class="container-fluid mt-3">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <h4 class="mb-1">
+                    <i class="fas fa-file-code"></i> {{ file.filename }}
+                </h4>
+                <p class="text-muted mb-0">
+                    {{ project.title }} • {{ file.language }}
+                </p>
+            </div>
+            <div>
+                <button id="save-btn" class="btn btn-success">
+                    <i class="fas fa-save"></i> Save
+                </button>
+                <a href="/project/{{ project.id }}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left"></i> Back to Project
+                </a>
+            </div>
+        </div>
+
+        <div class="row editor-container">
+            <div class="col-md-3 file-sidebar">
+                <h6>Project Files</h6>
+                <div class="mt-3">
+                    {% for project_file in project_files %}
+                        <a href="/editor/{{ project.id }}/{{ project_file.id }}" 
+                           class="file-item {% if project_file.id == file.id %}active{% endif %}">
+                            <i class="fas fa-file-code me-2"></i>
+                            {{ project_file.filename }}
                         </a>
-                    </div>
+                    {% endfor %}
                 </div>
-            </div>
-
-            <div class="card-body p-0 position-relative editor-container">
-                <!-- Line numbers -->
-                <div id="lineNumbers" class="line-numbers"></div>
-
-                <!-- Code editor -->
-                <div id="codeEditor" class="code-editor" contenteditable="true" spellcheck="false">{{ file.content or '# Start coding here...' }}</div>
-            </div>
-
-            <div class="card-footer">
-                <div class="d-flex justify-content-between align-items-center">
-                    <small class="text-muted">
-                        Lines: <span id="lineCount">1</span> |
-                        Language: <span class="badge bg-primary">{{ file.language }}</span> |
-                        Last saved: <span id="lastSaved">{{ file.updated_at[:16] if file.updated_at else 'Never' }}</span>
-                    </small>
-                    <button class="btn btn-sm btn-success" onclick="saveCode()">
-                        <i class="fas fa-save"></i> Save
+                <div class="mt-3">
+                    <button class="btn btn-sm btn-outline-primary w-100" onclick="createNewFile()">
+                        <i class="fas fa-plus"></i> New File
                     </button>
                 </div>
             </div>
+            
+            <div class="col-md-9 p-0">
+                <textarea id="code-editor" placeholder="Start coding here...">{{ file.content }}</textarea>
+            </div>
         </div>
-    </div>
-</div>
 
-<!-- New File Modal -->
-<div class="modal fade" id="newFileModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Create New File</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <form id="newFileForm">
-                    <div class="mb-3">
-                        <label for="filename" class="form-label">Filename</label>
-                        <input type="text" class="form-control" id="filename" name="filename"
-                               placeholder="e.g., main.py" required>
-                        <div class="form-text">Include file extension (e.g., .py, .js, .html)</div>
-                    </div>
-       <input type="hidden" id="project_id" value="{{ project_id }}">
-        </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="createNewFile()">Create File</button>
+        <div class="mt-3">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <small class="text-muted">
+                        <i class="fas fa-info-circle"></i>
+                        Changes are saved automatically when you click Save or use Ctrl+S
+                    </small>
+                    <span id="save-status" class="badge bg-secondary ms-2">Unsaved</span>
+                </div>
+                <div>
+                    <span class="text-muted">
+                        <i class="fas fa-code"></i> {{ file.language }}
+                    </span>
+                </div>
             </div>
         </div>
     </div>
-</div>
 
-<script>
-// Editor state
-let autoSaveTimeout;
-let isModified = false;
-const editor = document.getElementById('codeEditor');
-const saveStatus = document.getElementById('saveStatus');
-const lineCount = document.getElementById('lineCount');
-const lineNumbers = document.getElementById('lineNumbers');
+    <footer class="mt-5 py-4 bg-light">
+        <div class="container text-center">
+            <p class="mb-0">
+                Developed by <strong>Ezzaldeen Nashwan Ali Alhamoodi</strong> 
+                | CS50x 2025 Final Project
+            </p>
+        </div>
+    </footer>
 
-// Initialize editor
-function initializeEditor() {
-    updateLineNumbers();
-    setupEventListeners();
-    applySyntaxHighlighting();
-}
+    <script>
+        const editor = document.getElementById('code-editor');
+        const saveBtn = document.getElementById('save-btn');
+        const saveStatus = document.getElementById('save-status');
+        let autoSaveTimeout;
 
-// Update line numbers
-function updateLineNumbers() {
-    const lines = editor.textContent.split('\n').length;
-    lineCount.textContent = lines;
-
-    let numbersHTML = '';
-    for (let i = 1; i <= lines; i++) {
-        numbersHTML += `<div class="line-number">${i}</div>`;
-    }
-    lineNumbers.innerHTML = numbersHTML;
-}
-
-// Apply syntax highlighting
-function applySyntaxHighlighting() {
-    // Use Prism.js for syntax highlighting
-    Prism.highlightElement(editor);
-}
-
-// Auto-save function
-function autoSave() {
-    if (!isModified) return;
-
-    clearTimeout(autoSaveTimeout);
-    saveStatus.className = 'badge bg-warning';
-    saveStatus.textContent = 'Saving...';
-
-    autoSaveTimeout = setTimeout(async () => {
-        await saveToServer();
-    }, 1500);
-}
-
-// Save to server
-async function saveToServer() {
-    try {
-        const response = await fetch('/api/save_code', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                file_id: {{ file.id }},
-                content: editor.textContent
+        function saveCode() {
+            const content = editor.value;
+            
+            fetch('/api/save_code', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    file_id: {{ file.id }},
+                    content: content
+                })
             })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    saveStatus.textContent = 'Saved';
+                    saveStatus.className = 'badge bg-success ms-2';
+                    setTimeout(() => {
+                        saveStatus.textContent = 'Unsaved';
+                        saveStatus.className = 'badge bg-secondary ms-2';
+                    }, 3000);
+                } else {
+                    saveStatus.textContent = 'Error';
+                    saveStatus.className = 'badge bg-danger ms-2';
+                    alert('Save failed: ' + data.error);
+                }
+            })
+            .catch(error => {
+                saveStatus.textContent = 'Error';
+                saveStatus.className = 'badge bg-danger ms-2';
+                alert('Save failed: ' + error);
+            });
+        }
+
+        // الحفظ التلقائي عند التوقف عن الكتابة
+        editor.addEventListener('input', () => {
+            saveStatus.textContent = 'Unsaved';
+            saveStatus.className = 'badge bg-warning ms-2';
+            
+            clearTimeout(autoSaveTimeout);
+            autoSaveTimeout = setTimeout(saveCode, 5000);
         });
 
-        const result = await response.json();
+        // الحفظ اليدوي
+        saveBtn.addEventListener('click', saveCode);
 
-        if (result.success) {
-            saveStatus.className = 'badge bg-success';
-            saveStatus.textContent = 'Saved';
-            isModified = false;
-            document.getElementById('lastSaved').textContent = new Date().toLocaleTimeString();
-        } else {
-            saveStatus.className = 'badge bg-danger';
-            saveStatus.textContent = 'Error';
-        }
-    } catch (error) {
-        saveStatus.className = 'badge bg-danger';
-        saveStatus.textContent = 'Error';
-    }
-}
-
-// Manual save
-function saveCode() {
-    clearTimeout(autoSaveTimeout);
-    saveToServer();
-}
-
-// Format code
-function formatCode() {
-    const content = editor.textContent;
-    let formatted = content;
-
-    switch('{{ file.language }}') {
-        case 'python':
-            formatted = formatPythonCode(content);
-            break;
-        case 'javascript':
-            formatted = formatJavaScriptCode(content);
-            break;
-        default:
-            formatted = content.trim();
-    }
-
-    editor.textContent = formatted;
-    updateLineNumbers();
-    applySyntaxHighlighting();
-    isModified = true;
-    autoSave();
-}
-
-// Format Python code
-function formatPythonCode(code) {
-    return code.split('\n').map(line => line.trim()).join('\n');
-}
-
-// Format JavaScript code
-function formatJavaScriptCode(code) {
-    return code.split('\n').map(line => line.trim()).join('\n');
-}
-
-// Copy code to clipboard
-function copyCode() {
-    navigator.clipboard.writeText(editor.textContent).then(() => {
-        const originalText = saveStatus.textContent;
-        saveStatus.className = 'badge bg-info';
-        saveStatus.textContent = 'Copied!';
-
-        setTimeout(() => {
-            saveStatus.className = 'badge bg-success';
-            saveStatus.textContent = originalText;
-        }, 2000);
-    });
-}
-
-// Setup event listeners
-function setupEventListeners() {
-    editor.addEventListener('input', function() {
-        isModified = true;
-        updateLineNumbers();
-        autoSave();
-
-        // Re-apply syntax highlighting
-        setTimeout(() => {
-            applySyntaxHighlighting();
-        }, 100);
-    });
-
-    // Tab key support
-    editor.addEventListener('keydown', function(e) {
-        if (e.key === 'Tab') {
-            e.preventDefault();
-            document.execCommand('insertText', false, '    ');
-            isModified = true;
-            autoSave();
-        }
-    });
-
-    // Handle paste events
-    editor.addEventListener('paste', function(e) {
-        e.preventDefault();
-        const text = e.clipboardData.getData('text/plain');
-        document.execCommand('insertText', false, text);
-        isModified = true;
-        autoSave();
-    });
-}
-
-// Create new file
-async function createNewFile() {
-    const filename = document.getElementById('filename').value;
-    const projectId = {{ project_id }};
-
-    if (!filename) {
-        alert('Please enter a filename');
-        return;
-    }
-
-    try {
-        const response = await fetch('/api/create_file', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                project_id: projectId,
-                filename: filename
-            })
+        // اختصارات لوحة المفاتيح
+        editor.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === 's') {
+                e.preventDefault();
+                saveCode();
+            }
         });
 
-        const result = await response.json();
-
-        if (result.success) {
-            bootstrap.Modal.getInstance(document.getElementById('newFileModal')).hide();
-            location.reload();
-        } else {
-            alert('Error creating file: ' + result.error);
+        function createNewFile() {
+            const filename = prompt("Enter filename (with extension):");
+            if (filename) {
+                fetch('/api/create_file', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        project_id: {{ project.id }},
+                        filename: filename
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        window.location.href = `/editor/{{ project.id }}/${data.file_id}`;
+                    } else {
+                        alert('Error creating file: ' + data.error);
+                    }
+                })
+                .catch(error => {
+                    alert('Error: ' + error);
+                });
+            }
         }
-    } catch (error) {
-        alert('Error creating file: ' + error);
-    }
-}
 
-// Handle browser refresh warning
-window.addEventListener('beforeunload', function (e) {
-    if (isModified || saveStatus.textContent === 'Saving...') {
-        e.preventDefault();
-        e.returnValue = '';
-    }
-});
+        // جعل editor يأخذ التركيز عند تحميل الصفحة
+        editor.focus();
+    </script>
 
-// Initialize when page loads
-document.addEventListener('DOMContentLoaded', initializeEditor);
-</script>
-
-<style>
-/* Editor container */
-.editor-container {
-    background: #2d2d2d;
-    min-height: 400px;
-}
-
-/* Line numbers */
-.line-numbers {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 50px;
-    height: 100%;
-    background-color: #2d2d2d;
-    border-right: 1px solid #444;
-    font-family: 'Consolas', 'Monaco', monospace;
-    font-size: 14px;
-    line-height: 1.5;
-    text-align: right;
-    padding: 10px 8px;
-    color: #6e7681;
-    user-select: none;
-    overflow: hidden;
-    z-index: 1;
-}
-
-.line-number {
-    height: 1.5em;
-}
-
-/* Code editor */
-.code-editor {
-    width: calc(100% - 50px);
-    height: 60vh;
-    margin-left: 50px;
-    padding: 10px;
-    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-    font-size: 14px;
-    line-height: 1.5;
-    background: #2d2d2d;
-    color: #cccccc;
-    border: none;
-    outline: none;
-    white-space: pre;
-    overflow-wrap: normal;
-    overflow-x: auto;
-    tab-size: 4;
-    resize: none;
-}
-
-/* Prism.js theme customization */
-.code-editor {
-    background: #2d2d2d !important;
-}
-
-/* Scrollbar styling */
-.code-editor::-webkit-scrollbar {
-    width: 12px;
-    height: 12px;
-}
-
-.code-editor::-webkit-scrollbar-track {
-    background: #2d2d2d;
-}
-
-.code-editor::-webkit-scrollbar-thumb {
-    background: #555;
-    border-radius: 6px;
-}
-
-.code-editor::-webkit-scrollbar-thumb:hover {
-    background: #666;
-}
-
-/* Remove focus outline */
-.code-editor:focus {
-    outline: none;
-}
-
-/* Card body styling */
-.card-body {
-    position: relative;
-    min-height: 400px;
-    padding: 0;
-}
-
-/* Active file styling */
-.list-group-item.active {
-    background-color: #0d6efd;
-    border-color: #0d6efd;
-}
-
-/* Prism theme overrides for better visibility */
-.token.comment,
-.token.prolog,
-.token.doctype,
-.token.cdata {
-    color: #999;
-}
-
-.token.punctuation {
-    color: #ccc;
-}
-
-.token.property,
-.token.tag,
-.token.boolean,
-.token.number,
-.token.constant,
-.token.symbol,
-.token.deleted {
-    color: #f08d49;
-}
-
-.token.selector,
-.token.attr-name,
-.token.string,
-.token.char,
-.token.builtin,
-.token.inserted {
-    color: #7ec699;
-}
-
-.token.operator,
-.token.entity,
-.token.url,
-.language-css .token.string,
-.style .token.string {
-    color: #67cdcc;
-}
-
-.token.atrule,
-.token.attr-value,
-.token.keyword {
-    color: #cc99cd;
-}
-
-.token.function,
-.token.class-name {
-    color: #f08d49;
-}
-
-.token.regex,
-.token.important,
-.token.variable {
-    color: #e90;
-}
-
-/* Make sure code is visible */
-.token {
-    color: #cccccc !important;
-}
-</style>
-{% endblock %}
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
